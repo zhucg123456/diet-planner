@@ -1,11 +1,12 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Merchant, MenuItem, OrderRecord, CalorieRecord, RecommendationState, UserSettings } from '../types';
+import type { Merchant, MenuItem, OrderRecord, CalorieRecord, CustomFood, RecommendationState, UserSettings } from '../types';
 
 class DietPlannerDB extends Dexie {
   merchants!: EntityTable<Merchant, 'id'>;
   menuItems!: EntityTable<MenuItem, 'id'>;
   orderRecords!: EntityTable<OrderRecord, 'id'>;
   calorieRecords!: EntityTable<CalorieRecord, 'id'>;
+  customFoods!: EntityTable<CustomFood, 'id'>;
   recommendationState!: EntityTable<RecommendationState, 'id'>;
   settings!: EntityTable<UserSettings, 'id'>;
 
@@ -18,6 +19,10 @@ class DietPlannerDB extends Dexie {
       calorieRecords: '++id, orderRecordId, date, foodName',
       recommendationState: '++id, lastUpdated',
       settings: '++id',
+    });
+    // v2：新增自定义食物表
+    this.version(2).stores({
+      customFoods: '++id, name',
     });
   }
 }
@@ -93,6 +98,19 @@ export async function addCalorieRecord(record: Omit<CalorieRecord, 'id'>): Promi
 export async function getDailyCalories(date: string): Promise<number> {
   const records = await db.calorieRecords.where('date').equals(date).toArray();
   return records.reduce((sum, r) => sum + r.calories, 0);
+}
+
+// ===== 自定义食物 =====
+export async function getCustomFoods(): Promise<CustomFood[]> {
+  return db.customFoods.toArray();
+}
+
+export async function addCustomFood(food: Omit<CustomFood, 'id'>): Promise<number> {
+  return db.customFoods.add(food as CustomFood) as Promise<number>;
+}
+
+export async function deleteCustomFood(id: number): Promise<void> {
+  await db.customFoods.delete(id);
 }
 
 // ===== 推荐状态 =====
