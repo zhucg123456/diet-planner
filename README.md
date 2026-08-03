@@ -2,6 +2,8 @@
 
 一个"今天吃什么"的选择困难症救星 + 个人饮食记录工具。纯前端本地优先（Local-First）架构，数据全部存在你自己的浏览器里，无需注册登录。
 
+**🌐 在线体验：[https://zhucg123456.github.io/diet-planner/](https://zhucg123456.github.io/diet-planner/)**
+
 ## ✨ 功能特性
 
 - **🎯 抽签推荐**：Shuffle Bag 伪随机算法（带种子的 Fisher-Yates 洗牌），保证每家商家在一轮内恰好出现一次，概率严格均等，拒绝真随机的"总是那几家"
