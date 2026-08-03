@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { getCalorieRecords, addCalorieRecord, getSettings } from '../db';
+import { getCalorieRecords, addCalorieRecord, getSettings, getCustomFoods, addCustomFood, deleteCustomFood } from '../db';
 import { matchCalorieLocal, recognizeCalorieByAI, fileToBase64 } from '../utils/calorie';
-import type { CalorieRecord } from '../types';
+import type { CalorieRecord, CustomFood } from '../types';
 
 export default function Calories() {
   const [records, setRecords] = useState<CalorieRecord[]>([]);
@@ -12,6 +12,12 @@ export default function Calories() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [dailyTarget, setDailyTarget] = useState(2000);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [customFoods, setCustomFoods] = useState<CustomFood[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newFoodName, setNewFoodName] = useState('');
+  const [newFoodKeywords, setNewFoodKeywords] = useState('');
+  const [newFoodCalories, setNewFoodCalories] = useState('');
+  const [newFoodUnit, setNewFoodUnit] = useState('一份');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -25,6 +31,7 @@ export default function Calories() {
 
   useEffect(() => {
     loadRecords();
+    getCustomFoods().then(setCustomFoods);
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -35,11 +42,37 @@ export default function Calories() {
     };
   }, []);
 
-  // 本地名称匹配
+  // 本地名称匹配（含自定义食物）
   const handleNameSearch = () => {
     if (!foodName.trim()) return;
-    const result = matchCalorieLocal(foodName);
+    const result = matchCalorieLocal(foodName, customFoods);
     setLocalResult(result);
+  };
+  
+  // 添加自定义食物
+  const handleAddCustomFood = async () => {
+    if (!newFoodName.trim() || !newFoodCalories) return;
+    const keywords = newFoodKeywords
+      .split(/[,，\s]+/)
+      .map(k => k.trim())
+      .filter(k => k.length > 0);
+    await addCustomFood({
+      name: newFoodName.trim(),
+      keywords,
+      calories: Number(newFoodCalories),
+      unit: newFoodUnit.trim() || '一份',
+    });
+    setCustomFoods(await getCustomFoods());
+    setNewFoodName('');
+    setNewFoodKeywords('');
+    setNewFoodCalories('');
+    setShowAddForm(false);
+  };
+  
+  // 删除自定义食物
+  const handleDeleteCustomFood = async (id: number) => {
+    await deleteCustomFood(id);
+    setCustomFoods(await getCustomFoods());
   };
 
   // 保存本地匹配结果
@@ -165,7 +198,7 @@ export default function Calories() {
           </div>
         )}
         {foodName && !localResult && (
-          <p className="text-xs text-gray-400">未找到匹配，试试拍照识别</p>
+          <p className="text-xs text-gray-400">未找到匹配，可在下方添加自定义食物，或试试拍照识别</p>
         )}
 
         {/* 方式2：拍照AI识别 */}
@@ -196,7 +229,71 @@ export default function Calories() {
           <img src={imagePreview} alt="食物图片" className="max-h-32 rounded-lg mx-auto" />
         )}
       </div>
-
+      
+      {/* 自定义食物库 */}
+      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+        <div className="flex justify-between items-center">
+          <h3 className="text-sm font-medium text-gray-600">我的食物库（{customFoods.length}）</h3>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="text-xs text-blue-500"
+          >{showAddForm ? '收起' : '＋ 添加自定义食物'}</button>
+        </div>
+      
+        {showAddForm && (
+          <div className="space-y-2 bg-gray-50 rounded-lg p-3">
+            <input
+              value={newFoodName}
+              onChange={(e) => setNewFoodName(e.target.value)}
+              placeholder="食物名称，如：中科院一食堂牛肉面"
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+            />
+            <input
+              value={newFoodKeywords}
+              onChange={(e) => setNewFoodKeywords(e.target.value)}
+              placeholder="关键词（逗号分隔，可留空），如：一食堂,牛肉面"
+              className="w-full px-3 py-2 border rounded-lg text-sm"
+            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={newFoodCalories}
+                onChange={(e) => setNewFoodCalories(e.target.value)}
+                placeholder="热量 kcal"
+                className="flex-1 px-3 py-2 border rounded-lg text-sm"
+              />
+              <input
+                value={newFoodUnit}
+                onChange={(e) => setNewFoodUnit(e.target.value)}
+                placeholder="单位"
+                className="w-20 px-3 py-2 border rounded-lg text-sm"
+              />
+            </div>
+            <button
+              onClick={handleAddCustomFood}
+              disabled={!newFoodName.trim() || !newFoodCalories}
+              className="w-full py-2 bg-blue-500 text-white rounded-lg text-sm disabled:opacity-40"
+            >保存</button>
+          </div>
+        )}
+      
+        {customFoods.length > 0 ? (
+          <div className="space-y-1">
+            {customFoods.map((f) => (
+              <div key={f.id} className="flex justify-between items-center py-1.5 text-sm border-b border-gray-50 last:border-0">
+                <span>{f.name} <span className="text-xs text-gray-300">/{f.unit}</span></span>
+                <span className="flex items-center gap-2">
+                  <span className="text-orange-500">{f.calories} kcal</span>
+                  <button onClick={() => handleDeleteCustomFood(f.id!)} className="text-gray-300 hover:text-red-400">✕</button>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : !showAddForm && (
+          <p className="text-xs text-gray-400">库里没找到常吃的食物？在这里添加，搜索时自动生效</p>
+        )}
+      </div>
+      
       {/* 周统计图表 */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <h3 className="text-sm font-medium text-gray-600 mb-3">近7天热量</h3>
