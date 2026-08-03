@@ -9,13 +9,45 @@ interface CalorieEntry {
 
 const database = calorieDB as CalorieEntry[];
 
-// 本地关键词模糊匹配
-export function matchCalorieLocal(foodName: string): { calories: number; matched: string } | null {
-  const name = foodName.toLowerCase().trim();
+// 常见食物同义词表：[别名, 规范名]，解决“西红柿/番茄”这类同义词匹配不到的问题
+const SYNONYMS: [string, string][] = [
+  ['西红柿', '番茄'],
+  ['马铃薯', '土豆'],
+  ['洋芋', '土豆'],
+  ['包菜', '卷心菜'],
+  ['圆白菜', '卷心菜'],
+  ['甘蓝', '卷心菜'],
+  ['凤梨', '菠萝'],
+  ['豆角', '四季豆'],
+  ['豇豆', '四季豆'],
+  ['角瓜', '西葫芦'],
+  ['倭瓜', '南瓜'],
+  ['奇异果', '猕猴桃'],
+  ['车厘子', '樱桃'],
+];
+
+// 文本归一化：把别名统一替换为规范名
+function normalizeFoodText(text: string): string {
+  let result = text;
+  for (const [alias, canonical] of SYNONYMS) {
+    if (result.includes(alias)) {
+      result = result.split(alias).join(canonical);
+    }
+  }
+  return result;
+}
+
+// 本地关键词模糊匹配（内置库 + 用户自定义食物，支持同义词归一化）
+export function matchCalorieLocal(
+  foodName: string,
+  customFoods: CalorieEntry[] = []
+): { calories: number; matched: string } | null {
+  const name = normalizeFoodText(foodName.toLowerCase().trim());
+  const allEntries = [...database, ...customFoods];
 
   // 精确匹配
-  for (const entry of database) {
-    if (entry.name.toLowerCase() === name) {
+  for (const entry of allEntries) {
+    if (normalizeFoodText(entry.name.toLowerCase()) === name) {
       return { calories: entry.calories, matched: entry.name };
     }
   }
@@ -24,15 +56,16 @@ export function matchCalorieLocal(foodName: string): { calories: number; matched
   let bestMatch: CalorieEntry | null = null;
   let bestScore = 0;
 
-  for (const entry of database) {
+  for (const entry of allEntries) {
     let score = 0;
     for (const kw of entry.keywords) {
-      if (name.includes(kw.toLowerCase())) {
+      if (name.includes(normalizeFoodText(kw.toLowerCase()))) {
         score += kw.length; // 更长的关键词匹配得分更高
       }
     }
     // 名称包含匹配
-    if (name.includes(entry.name.toLowerCase()) || entry.name.toLowerCase().includes(name)) {
+    const entryName = normalizeFoodText(entry.name.toLowerCase());
+    if (name.includes(entryName) || entryName.includes(name)) {
       score += entry.name.length;
     }
     if (score > bestScore) {
