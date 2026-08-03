@@ -39,6 +39,15 @@ export interface CalorieRecord {
   date: string;
 }
 
+// 自定义食物（用户自行维护，存浏览器）
+export interface CustomFood {
+  id?: number;
+  name: string;
+  keywords: string[];
+  calories: number; // 每份热量 (kcal)
+  unit: string;
+}
+
 // 推荐历史（Shuffle Bag 状态）
 export interface RecommendationState {
   id?: number;
